@@ -92,8 +92,6 @@ def bind(rover, pipeline, logging, fps):
 
 
 def start():
-    df = pd.DataFrame( columns=["Heading", "Steering", "Throttle", "Idx"])
-    df.to_csv(csv_file)
     log_file = "logger.txt"
     #rover = connect_device("127.0.0.1:14550")
     rover = connect_device('/dev/ttyUSB0')
