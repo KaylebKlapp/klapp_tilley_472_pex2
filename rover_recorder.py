@@ -7,7 +7,7 @@ import numpy as np
 import cv2
 import logging
 from imutils.video import FPS
-from utilities import drone_lib as dl
+from  klapp_tilley_472_pex2.utilities import drone_lib as dl
 import random as rand
 import pandas as pd
 import csv
@@ -70,14 +70,12 @@ def bind(rover, pipeline, logging, fps):
             if not bgr_frame or not depth_frame:
                 continue
 
-            # if (not rover.channels['3'] is None
-            #         and not rover.channels['1'] is None):
-            #     throttle = int(rover.channels['3'])
-            #     steering_mix = int(rover.channels['1'])
+            if (rover.channels['3'] is None
+                or rover.channels['1'] is None):
+                continue
 
-            throttle = rand.randint(1, 2000)
-            steering_mix = rand.randint(1, 2000)
-            heading = rover.heading
+            throttle = int(rover.channels['3'])
+            steering_mix = int(rover.channels['1'])
             frm_num = int(bgr_frame.frame_number)
 
             # write throttle and steering related to current frame...
@@ -88,7 +86,6 @@ def bind(rover, pipeline, logging, fps):
                 dl.display_rover_state(rover)
 
             # update the FPS counter
-
             fps.update()
             
         except Exception as e:
@@ -132,7 +129,7 @@ def start():
     return logging, pipeline, fps, rover
 
 
-def main(args):
+def main(args = None):
     log, pipe, fps, rover = start()
     bind(rover, pipe, log, fps)
     pipe.stop()
@@ -141,4 +138,4 @@ def main(args):
 
 if __name__ == "__main__":
     # execute only if run as a script
-    main(sys.argv)
+    main()
