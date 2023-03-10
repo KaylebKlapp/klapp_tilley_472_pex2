@@ -1,3 +1,4 @@
+from xmlrpc.client import DateTime
 from dronekit import connect, VehicleMode, LocationGlobalRelative
 import time
 import sys
@@ -10,8 +11,7 @@ from utilities import drone_lib as dl
 import random as rand
 import pandas as pd
 import csv
-
-
+from datetime import datetime
 
 def connect_device(s_connection):
     print("Connecting to device...")
@@ -35,23 +35,7 @@ def arm_device(device):
         print("Waiting for arm...")
         time.sleep(2)
         device.armed = True
-
-
-def goto_point(device, lat, lon, speed, alt):
-    print(f"Goto point: {lat}, {lon}, {speed}, {alt}...")
-
-    point = LocationGlobalRelative(lat, lon, alt)
-    device.simple_goto(point)
-    # set the default travel speed
-    device.airspeed = speed
-    while (device.location.global_relative_frame.alt != alt
-           and device.location.global_relative_frame.lon != lon
-           and device.location.global_relative_frame.lat != lat):
-        print(f"Current altitude: {device.location.global_relative_frame.alt}")
-        print(f"Current lat: {device.location.global_relative_frame.lat}")
-        print(f"Current lon: {device.location.global_relative_frame.lon}")
-
-
+        
 def stream_video(pipeline):
     while (True):
 
@@ -65,11 +49,10 @@ def stream_video(pipeline):
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
-
-
+        
 def append_ardu_data(throttle, steering, heading, idx ):
     df = pd.read_csv('rover.csv')
-    df2 = pd.DataFrame( [[throttle,steering,heading,idx]],  columns=["Heading", "Steering", "Throttle", "Idx"] )
+    df2 = pd.DataFrame( [[throttle,steering,heading,idx]], columns=["Heading", "Steering", "Throttle", "Idx"] )
     df = df.append(df2, ignore_index = True)
     df.to_csv('rover.csv')
 
@@ -79,7 +62,6 @@ def bind(rover, pipeline, logging, fps):
     state_update_interval = 104
     # stream_video(pipeline)
     while rover.armed:
-
         try:
             # Wait for a coherent pair of frames: depth and color
             frames = pipeline.wait_for_frames()
@@ -108,11 +90,7 @@ def bind(rover, pipeline, logging, fps):
             # update the FPS counter
 
             fps.update()
-
-
-
-
-
+            
         except Exception as e:
 
             logging.error("Unexpected error while streaming.", exc_info=True)
@@ -125,7 +103,7 @@ def start():
     df = pd.DataFrame( columns=["Heading", "Steering", "Throttle", "Idx"])
     df.to_csv('rover.csv')
     log_file = "logger.txt"
-    bag_file = "telemetry.bag"
+    bag_file = f"telemetry_{datetime.now}.bag"
     rover = connect_device("127.0.0.1:14550")
     arm_device(rover)
     # prepare log file...
