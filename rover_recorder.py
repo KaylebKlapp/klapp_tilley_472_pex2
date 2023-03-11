@@ -7,7 +7,7 @@ import numpy as np
 import cv2
 import logging
 from imutils.video import FPS
-from  klapp_tilley_472_pex2.utilities import drone_lib as dl
+from  utilities import drone_lib as dl
 import random as rand
 import pandas as pd
 import csv
@@ -22,19 +22,13 @@ def connect_device(s_connection):
 
 
 def arm_device(device):
-    while not device.is_armable:
-        print("Switching device to armable...")
-        time.sleep(2)
-        # "GUIDED" mode sets drone to listen
-        # for our commands that tell it what to do...
-    while device.mode != "GUIDED":
-        print("Switching to GUIDED mode...")
-        device.mode = VehicleMode("GUIDED")
+    while device.mode != "MANUAL":
+        print("Switching to MANUAL  mode...")
+        device.mode = VehicleMode("MANUAL")
         time.sleep(2)
     while not device.armed:
-        print("Waiting for arm...")
-        time.sleep(2)
-        device.armed = True
+        print("Please switch device to armed...")
+        time.sleep(1)
         
 def stream_video(pipeline):
     while (True):
@@ -51,10 +45,9 @@ def stream_video(pipeline):
             break
         
 def append_ardu_data(throttle, steering, heading, idx ):
-    df = pd.read_csv('rover.csv')
-    df2 = pd.DataFrame( [[throttle,steering,heading,idx]], columns=["Heading", "Steering", "Throttle", "Idx"] )
-    df = df.append(df2, ignore_index = True)
-    df.to_csv('rover.csv')
+    fp = open(csv_file, 'a')
+    fp.write(f"{throttle},{steering},{heading},{idx}\n")
+    fp.close()
 
 
 
@@ -77,6 +70,7 @@ def bind(rover, pipeline, logging, fps):
             throttle = int(rover.channels['3'])
             steering_mix = int(rover.channels['1'])
             frm_num = int(bgr_frame.frame_number)
+            heading = rover.heading
 
             # write throttle and steering related to current frame...
             append_ardu_data(throttle=throttle, steering=steering_mix,
@@ -98,14 +92,13 @@ def bind(rover, pipeline, logging, fps):
 
 def start():
     df = pd.DataFrame( columns=["Heading", "Steering", "Throttle", "Idx"])
-    df.to_csv('rover.csv')
+    df.to_csv(csv_file)
     log_file = "logger.txt"
-    bag_file = f"telemetry_{datetime.now}.bag"
-    rover = connect_device("127.0.0.1:14550")
+    #rover = connect_device("127.0.0.1:14550")
+    rover = connect_device('/dev/ttyUSB0')
     arm_device(rover)
     # prepare log file...
     handlers = [logging.FileHandler(log_file), logging.StreamHandler()]
-    logging.basicConfig(level=logging.DEBUG, handlers=handlers)
     logging.info(f"Recording to be stored in location: {bag_file}.")
     logging.info("Preparing RealSense data streams...")
     # Configure depth and color streams
@@ -113,7 +106,7 @@ def start():
     config = rs.config()
     config.enable_record_to_file(f"{bag_file}")
     logging.info("Configuring depth stream.")
-    config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
+    #config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
     logging.info("configuring rgb stream.")
     config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
     # Start streaming
@@ -133,9 +126,13 @@ def main(args = None):
     log, pipe, fps, rover = start()
     bind(rover, pipe, log, fps)
     pipe.stop()
+    time.sleep(10)
 
 
 
 if __name__ == "__main__":
     # execute only if run as a script
+    collect_key = datetime.now().strftime('%m%d_%H%M_%S')
+    csv_file = f'/media/usafa/data/telemetry/csvs/rover_{collect_key}.csv'
+    bag_file = f"/media/usafa/data/telemetry/telemetry_{collect_key}.bag"
     main()
