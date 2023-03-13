@@ -65,6 +65,7 @@ def bind(rover, pipeline, logging, fps):
 
             if (rover.channels['3'] is None
                 or rover.channels['1'] is None):
+                print("None found in channel")
                 continue
 
             throttle = int(rover.channels['3'])
