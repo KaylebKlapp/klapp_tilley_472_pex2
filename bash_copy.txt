@@ -1,0 +1,4 @@
+#!/bin/bash
+cp /media/usafa/PycharmProjects/USAFA/pex2/*.bag /media/usafa/extern_data/Team Just Kidding/Collections
+cp /media/usafa/PycharmProjects/USAFA/pex2/csvs/* /media/usafa/extern_data/Team Just Kidding/Collections/*
+echo "File copy complete"
