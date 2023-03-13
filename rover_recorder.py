@@ -126,18 +126,19 @@ def main(args = None):
     log, pipe, fps, rover = start()
     bind(rover, pipe, log, fps)
     pipe.stop()
-    time.sleep(10)
 
 if __name__ == "__main__":
     prefix = "" if len(sys.argv) == 1 else sys.argv[1] + "_"
     run = True
     while (run):
         collect_key = datetime.now().strftime('%m%d_%H%M_%S')
-        csv_file = f'/media/usafa/data/telemetry/csvs/{prefix}rover_{collect_key}.csv'
-        bag_file = f"/media/usafa/data/telemetry/{prefix}telemetry_{collect_key}.bag"
+        csv_file = f'/media/usafa/data/telemetry/csvs/{prefix}{collect_key}.csv'
+        bag_file = f"/media/usafa/data/telemetry/{prefix}{collect_key}.bag"
 
         # execute only if run as a script
         main()
+        print("Pausing for realsense buffer...")
+        time.sleep(10)
         again = input("Run another collection? (y/n) ")
         run = (again == 'y')
         if (run):
