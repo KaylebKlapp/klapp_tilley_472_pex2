@@ -23,8 +23,9 @@ def build_model():
 
     model = keras.Model(inputs=[headings, images], outputs=outputs)
 
-    return model.compile(optimizer='adam', loss={'outputs': 'mse'},
+    model.compile(optimizer='adam', loss={'outputs': 'mse'},
                   metrics={'throttle': 'mae', 'steering': 'mae'})
+    return model
 
 
 def get_attributes(csv_string):
@@ -39,10 +40,6 @@ def process_img(img):
     rs_img = resize(img, (320, 240))
     img_bw = inRange(rs_img, white_threshold, white)
     return  img_bw[0:320][80:240]
-
-    for file_name in glob("", recursive=False):
-        file_name_array = file_name.split("_")
-        process_train_file()
 
 def generate_training_data(num_samples = 32):
     files = glob("*", recursive= False)
@@ -113,7 +110,7 @@ def generate_validation_data(file_path, num_samples=512):
     pipeline.start(config)
     old_heading = 0
     for line in lines:
-        heading, steering, throttle, index = get_attributes(csv_string)
+        heading, steering, throttle, index = get_attributes(line)
         frame = pipeline.wait_for_frames().get_color_frame()
         while frame.frame_number < index:
             frame = pipeline.wait_for_frames().get_color_frame()
@@ -128,8 +125,7 @@ def generate_validation_data(file_path, num_samples=512):
 
 
 def train_model(model, batch_size = 32):
-    run = True
-    model.fit()
+    pass
 
 chdir("/media/usafa/extern_data/Team Just Kidding/Collections/")
 
