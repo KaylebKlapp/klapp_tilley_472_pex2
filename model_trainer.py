@@ -44,7 +44,7 @@ def process_img(img):
     return  img_bw[0:320][80:240]
 
 def generate_training_data(num_samples = 512):
-    print("Hello?")
+
     files = glob("*.bag", recursive= False)
 
     for file_name in files:
@@ -91,17 +91,16 @@ def generate_training_data(num_samples = 512):
                     frame = pipeline.wait_for_frames().get_color_frame()
 
                 img = np.asanyarray(frame.get_data())
-                inputs.append([heading - old_heading])
+                inputs.append(heading - old_heading)
                 outputs.append([steering, throttle])
                 frames.append(process_img(img))
                 
                 old_heading = heading
                 count += 1
 
-            for frame in frames:
-                imshow("hello", frame)
-                waitKey(10)
-            yield  [frames, inputs], outputs
+
+            yield  [tf.expand_dims(frames, 0), inputs], outputs
+            return
 
         csv_fp.close()
         pipeline.stop()
@@ -110,7 +109,8 @@ def generate_training_data(num_samples = 512):
 
 def generate_validation_data(file_path, num_samples=512):
     bag_file = file_path
-    csv_file =  "csvs/" + bag_file.replace(".bag", ".csv")
+    csv_file =  bag_file.rstrip(".bag")
+    csv_file = "csvs/" +csv_file +".csv"
     csv_fp = open(csv_file, "r")
     lines = csv_fp.readlines()
     num_lines = len(lines)
@@ -127,7 +127,7 @@ def generate_validation_data(file_path, num_samples=512):
     pipeline.start(config)
     old_heading = 0
     for i in range(0, num_lines, offset):
-        old_heading, _, _ = get_attributes(lines[i - 1]) if i is not 1 else 0
+        old_heading, _, _ , _= get_attributes(lines[i - 1]) if i is not 1 else [0,0,0,0]
         heading, steering, throttle, index = get_attributes(lines[i])
         frame = pipeline.wait_for_frames().get_color_frame()
         while frame.frame_number < index:
@@ -140,22 +140,26 @@ def generate_validation_data(file_path, num_samples=512):
         validation_inputs.append([steering, throttle])
 
 
-    return [validation_frames, validation_inputs], validation_outputs
+    return [tf.expand_dims(validation_frames, 0), validation_inputs], validation_outputs
 
 
-#validation_data = generate_validation_data(validation_fp)
+
 
 def train_model(model, batch_size = 32):
-    # history = model.fit(
-    #     generate_training_data,
-    #     validation_data=validation_data,
-    pass
+    history = model.fit(
+        generate_training_data(),
+        validation_data=validation_data,
+        batch_size=32,
+        epochs =1,
+        verbose = 1)
+    model.save("trained_model")
 
 
 
-
-#chdir("/media/usafa/extern_data/Team Just Kidding/Collections/")
+chdir("/media/usafa/extern_data/Team Just Kidding/Collections/")
+validation_data = generate_validation_data("cc_1_0313_1037_49.bag")
 model = build_model()
+train_model(model)
 
 
 
