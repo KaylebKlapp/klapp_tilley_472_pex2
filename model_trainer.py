@@ -11,18 +11,20 @@ height = 160
 width = 320
 
 def build_model():
+    headings = layers.Input(shape=(1,), name='headings')
     images = layers.Input(shape=(height, width,1), name='images')
-    conv1 = layers.Conv2D(32, (3, 3), activation='relu')(images)
-    pool1 = layers.MaxPooling2D((2, 2))(conv1)
+    conv1 = layers.Conv2D(64, (6, 6), activation='relu')(images)
+    conv2 = layers.Conv2D(64, (3, 3), activation='relu')(conv2)
+    pool1 = layers.MaxPooling2D((2, 2))(pool1)
     flatten = layers.Flatten()(pool1)
     dense1 = layers.Dense(32, activation='relu')(flatten)
-    headings = layers.Input(shape=(1,), name='headings')
     concat = layers.Concatenate()([dense1, headings])
-    dense2 = layers.Dense(16, activation='relu')(concat)
-    outputs = layers.Dense(2, name='outputs')(dense2)
+    dense2 = layers.Dense(32, activation='relu')(concat)
+    dense3 = layers.Dense(32, activation='relu')(dense2)
+    dense4 = layers.Dense(16, activation='relu')(dense3)
+    outputs = layers.Dense(2, name='outputs')(dense4)
 
     model = keras.Model(inputs=[headings, images], outputs=outputs)
-    # model = keras.Model(inputs=images, outputs=outputs)
 
     c_model = model.compile(optimizer='adam', loss='mse')
     
