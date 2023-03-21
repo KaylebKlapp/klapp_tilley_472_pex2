@@ -7,7 +7,7 @@ if [ -d "/media/usafa/extern_data/Team Just Kidding/Collections" ]; then
     echo "File copy complete"
 else
     echo "Path not found."
-
+fi
 
 
 
