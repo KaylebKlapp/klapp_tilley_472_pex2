@@ -1,6 +1,6 @@
 import pyrealsense2.pyrealsense2 as rs
 from cv2 import resize, inRange, imshow, waitKey
-from os import chdir, rename,path
+from os import chdir, rename, path, getcwd
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
@@ -11,12 +11,12 @@ height = 160
 width = 320
 
 def build_model():
-    headings = layers.Input(shape=(1,), name='headings')
     images = layers.Input(shape=(height, width,1), name='images')
     conv1 = layers.Conv2D(32, (3, 3), activation='relu')(images)
     pool1 = layers.MaxPooling2D((2, 2))(conv1)
     flatten = layers.Flatten()(pool1)
     dense1 = layers.Dense(32, activation='relu')(flatten)
+    headings = layers.Input(shape=(1,), name='headings')
     concat = layers.Concatenate()([dense1, headings])
     dense2 = layers.Dense(16, activation='relu')(concat)
     outputs = layers.Dense(2, name='outputs')(dense2)
@@ -59,7 +59,9 @@ def generate_training_data(num_samples = 512):
         config = rs.config()
         config.enable_device_from_file(bag_file)
         config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
-        pipeline.start(config)
+        profile = pipeline.start(config)
+        playback = profile.get_device().as_playback()
+        playback.set_real_time(False)
 
         csv_fp = open(csv_file, "r")
         line = csv_fp.readline()
@@ -107,7 +109,7 @@ def generate_training_data(num_samples = 512):
         #rename(csv_file, f"TRAINED_{csv_file}")
         #rename(csv_file, f"TRAINED_{bag_file}")
 
-def generate_validation_data(file_path, num_samples=512):
+def generate_validation_data(file_path, num_samples=32):
     bag_file = file_path
     csv_file =  bag_file.rstrip(".bag")
     csv_file = "csvs/" +csv_file +".csv"
@@ -117,51 +119,57 @@ def generate_validation_data(file_path, num_samples=512):
     offset = int(num_lines / num_samples)
 
     validation_frames = [] 
-    validation_inputs = [] 
+    validation_inputs = []
     validation_outputs = [] 
 
     pipeline = rs.pipeline()
     config = rs.config()
     config.enable_device_from_file(bag_file)
     config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
-    pipeline.start(config)
+    profile = pipeline.start(config)
+    playback = profile.get_device().as_playback()
+    playback.set_real_time(False)
     old_heading = 0
     for i in range(0, num_lines, offset):
-        old_heading, _, _ , _= get_attributes(lines[i - 1]) if i is not 1 else [0,0,0,0]
+        old_heading, _, _ , _= get_attributes(lines[i - 1]) if i != 1 else [0,0,0,0]
         heading, steering, throttle, index = get_attributes(lines[i])
         frame = pipeline.wait_for_frames().get_color_frame()
         while frame.frame_number < index:
             frame = pipeline.wait_for_frames().get_color_frame()
         old_heading = old_heading - heading
 
-        validation_inputs.append(np.asarray([heading - old_heading]))
+        validation_inputs.append(np.array(heading - old_heading))
         validation_frames.append(process_img(np.asanyarray(frame.get_data())))
-        validation_inputs.append([steering, throttle])
+        validation_outputs.append([steering, throttle])
 
-        np_validation_inputs =np.array(validation_inputs)
+        np_validation_inputs = np.asanyarray(validation_inputs)
 
-        print( np_validation_inputs.shape)
+        print(np_validation_inputs.shape)
 
-    return [tf.expand_dims(validation_frames, 0),np.array( validation_inputs)], np.array(validation_outputs)
+    return  np.array([validation_frames, np.array(validation_inputs)]), np.array(validation_outputs)
 
 
 
 
 def train_model(model, batch_size = 32):
     history = model.fit(
-        generate_training_data(),
-        validation_data=validation_data,
+        validation_data,
         batch_size=32,
         epochs =1,
         verbose = 1)
+    chdir(curdir)
     model.save("trained_model")
 
-
+curdir = getcwd()
 
 if path.isdir("/media/usafa/extern_data/Team Just Kidding/Collections/"):
     chdir("/media/usafa/extern_data/Team Just Kidding/Collections/")
+if path.isdir("C:\\Users\\Kayleb\\source\\repos\\472\\Collections"):
+    chdir("C:\\Users\\Kayleb\\source\\repos\\472\\Collections")
 else:
      chdir("/media/internal/data/Collections/Collections/")
+
+
 
 
 validation_data = generate_validation_data("cc_1_0313_1037_49.bag")
