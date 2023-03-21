@@ -38,6 +38,17 @@ def get_attributes(csv_string):
 white_threshold = np.array([215, 215, 215])
 white = np.array([255, 255, 255])
 
+def create_pipeline(file):
+    pipeline = rs.pipeline()
+    config = rs.config()
+    config.enable_device_from_file(file)
+    config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
+    profile = pipeline.start(config)
+    playback = profile.get_device().as_playback()
+    playback.set_real_time(False)
+
+    return pipeline
+
 def process_img(img):
     rs_img = resize(img, (320, 240))
     img_bw = inRange(rs_img, white_threshold, white)
@@ -48,25 +59,20 @@ def generate_training_data(num_samples = 512):
     files = glob("*.bag", recursive= False)
 
     for file_name in files:
-        if ("TRAINED" in file_name):
+        if ("TRAINED" in file_name or "VALIDATION" in file_name):
             continue
 
         generic_file_name = file_name.rstrip(".bag")
         bag_file = file_name
         csv_file =  "csvs/" + generic_file_name + ".csv"
 
-        pipeline = rs.pipeline()
-        config = rs.config()
-        config.enable_device_from_file(bag_file)
-        config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
-        profile = pipeline.start(config)
-        playback = profile.get_device().as_playback()
-        playback.set_real_time(False)
+        pipeline = create_pipeline(bag_file)
 
         csv_fp = open(csv_file, "r")
         line = csv_fp.readline()
         first_run = True
-        old_heading = None
+        old_heading = 0
+
         while line != "":
             if first_run:
                 inputs = []
@@ -93,16 +99,15 @@ def generate_training_data(num_samples = 512):
                     frame = pipeline.wait_for_frames().get_color_frame()
 
                 img = np.asanyarray(frame.get_data())
-                inputs.append([heading - old_heading])
-                outputs.append([steering, throttle])
+                inputs.append(heading - old_heading)
+                outputs.append(np.array([steering, throttle]))
                 frames.append(process_img(img))
                 
                 old_heading = heading
                 count += 1
 
 
-            yield  [tf.expand_dims(frames, 0),np.array( inputs)] ,np.array(outputs)
-            return
+            yield [np.array(frames), np.array(inputs)], np.array(outputs)
 
         csv_fp.close()
         pipeline.stop()
@@ -112,7 +117,7 @@ def generate_training_data(num_samples = 512):
 def generate_validation_data(file_path, num_samples=32):
     bag_file = file_path
     csv_file =  bag_file.rstrip(".bag")
-    csv_file = "csvs/" +csv_file +".csv"
+    csv_file = "csvs/" + csv_file + ".csv"
     csv_fp = open(csv_file, "r")
     lines = csv_fp.readlines()
     num_lines = len(lines)
@@ -122,28 +127,21 @@ def generate_validation_data(file_path, num_samples=32):
     validation_inputs = []
     validation_outputs = [] 
 
-    pipeline = rs.pipeline()
-    config = rs.config()
-    config.enable_device_from_file(bag_file)
-    config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
-    profile = pipeline.start(config)
-    playback = profile.get_device().as_playback()
-    playback.set_real_time(False)
+    pipeline = create_pipeline(bag_file)
     old_heading = 0
     for i in range(0, num_lines, offset):
         old_heading, _, _ , _= get_attributes(lines[i - 1]) if i != 1 else [0,0,0,0]
         heading, steering, throttle, index = get_attributes(lines[i])
         frame = pipeline.wait_for_frames().get_color_frame()
+
         while frame.frame_number < index:
             frame = pipeline.wait_for_frames().get_color_frame()
-        old_heading = old_heading - heading
 
-        validation_inputs.append(heading)
+        validation_inputs.append(heading - old_heading)
         validation_frames.append(process_img(np.asanyarray(frame.get_data())))
         validation_outputs.append(np.array([steering, throttle]))
-        print(np.array(validation_inputs).shape)
-
-        np_validation_inputs = np.asanyarray(validation_inputs)
+        
+        old_heading = heading
         
 
     return  [np.array(validation_inputs),np.array(validation_frames)], np.array(validation_outputs)
@@ -151,8 +149,8 @@ def generate_validation_data(file_path, num_samples=32):
 
 def train_model(model, batch_size = 32):
     history = model.fit(
-        validation_data,
-        validation_y,
+        generate_training_data(),
+        validation_data=[validation_data, validation_y],
         batch_size=32,
         epochs =1,
         verbose = 1)
