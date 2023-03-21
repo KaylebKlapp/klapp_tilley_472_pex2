@@ -107,7 +107,7 @@ def generate_training_data(num_samples = 512):
                 count += 1
 
 
-            yield [np.array(frames), np.array(inputs)], np.array(outputs)
+            yield [np.array(inputs), np.array(frames)], np.array(outputs)
 
         csv_fp.close()
         pipeline.stop()
@@ -150,11 +150,12 @@ def generate_validation_data(file_path, num_samples=32):
 def train_model(model, batch_size = 32):
     history = model.fit(
         generate_training_data(),
-        validation_data=[validation_data, validation_y],
+        validation_data= (validation_data, validation_y),
         batch_size=32,
-        epochs =1,
+        epochs =100,
         verbose = 1)
     chdir(curdir)
+    print(f"Saving model to {curdir}")
     model.save("trained_model")
 
 curdir = getcwd()
