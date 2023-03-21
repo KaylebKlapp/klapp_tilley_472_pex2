@@ -16,13 +16,13 @@ def build_model():
     pool1 = layers.MaxPooling2D((2, 2))(conv1)
     flatten = layers.Flatten()(pool1)
     dense1 = layers.Dense(32, activation='relu')(flatten)
-    #headings = layers.Input(shape=(1,), name='headings')
-    #concat = layers.Concatenate()([dense1, headings])
-    dense2 = layers.Dense(16, activation='relu')(dense1)
+    headings = layers.Input(shape=(1,), name='headings')
+    concat = layers.Concatenate()([dense1, headings])
+    dense2 = layers.Dense(16, activation='relu')(concat)
     outputs = layers.Dense(2, name='outputs')(dense2)
 
-    #model = keras.Model(inputs=[headings, images], outputs=outputs)
-    model = keras.Model(inputs=images, outputs=outputs)
+    model = keras.Model(inputs=[headings, images], outputs=outputs)
+    # model = keras.Model(inputs=images, outputs=outputs)
 
     c_model = model.compile(optimizer='adam', loss='mse')
     
@@ -138,7 +138,7 @@ def generate_validation_data(file_path, num_samples=32):
             frame = pipeline.wait_for_frames().get_color_frame()
         old_heading = old_heading - heading
 
-        #validation_inputs.append(process_img(np.asanyarray(frame.get_data())))
+        validation_inputs.append(heading)
         validation_frames.append(process_img(np.asanyarray(frame.get_data())))
         validation_outputs.append(np.array([steering, throttle]))
         print(np.array(validation_inputs).shape)
@@ -146,7 +146,7 @@ def generate_validation_data(file_path, num_samples=32):
         np_validation_inputs = np.asanyarray(validation_inputs)
         
 
-    return  np.array(validation_frames), np.array(validation_outputs)
+    return  [np.array(validation_inputs),np.array(validation_frames)], np.array(validation_outputs)
 
 
 def train_model(model, batch_size = 32):
@@ -166,13 +166,12 @@ if path.isdir("/media/usafa/extern_data/Team Just Kidding/Collections/"):
 if path.isdir("C:\\Users\\Kayleb\\source\\repos\\472\\Collections"):
     chdir("C:\\Users\\Kayleb\\source\\repos\\472\\Collections")
 else:
-     chdir("/media/internal/data/Collections/Collections/")
+     chdir("C:/Users/C23Jason.Tilley/Desktop/AI/Collections")
 
 
 
 
 validation_data, validation_y = generate_validation_data("cc_1_0313_1037_49.bag")
-print(validation_data.shape)
 print(validation_y.shape)
 model = build_model()
 train_model(model)
