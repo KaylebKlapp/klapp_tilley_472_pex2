@@ -7,6 +7,7 @@ import pyrealsense2.pyrealsense2 as rs
 from  utilities import drone_lib as dl
 from dronekit import connect, VehicleMode
 import time
+import sys
 
 def connect_device(s_connection):
     print("Connecting to device...")
@@ -16,13 +17,12 @@ def connect_device(s_connection):
     return device
 
 def get_model(model_file):
-    model = keras.models.load_model(model_file)
+    model = keras.models.load_model(model_file, compile=False)
+    model.compile(optimizer='adam', loss='mse')
     return model
 
 def get_predictions(heading, frame):
-    heading = tf.expand_dims(heading, 0)
-    frame = tf.expand_dims(frame, 0)
-    return model.predict([frame, heading])
+    return model.predict((np.array([frame]), np.array([heading])))
 
 
 white_threshold = np.array([215, 215, 215])
@@ -35,15 +35,17 @@ def process_img(img):
 def run():
     print("Running...")
     old_heading = 0
-    while drone.is_armed:
-        frame = pipeline.wait_for_frames().get_color_frame().get_data()
+    while drone.armed:
+        frame = np.asanyarray(pipeline.wait_for_frames().get_color_frame().get_data())
         p_frame = process_img(frame)
         heading = drone.heading - old_heading
         old_heading = drone.heading
 
-        steering, throttle = get_predictions(p_frame, heading)
-        drone.channels['1'] = steering
-        drone.channels['3'] = throttle
+        preds =  get_predictions(p_frame, heading)
+        print(preds)
+
+        drone.channels.overrides = {'1': int(abs(preds[0][0])), '3' : int(abs(preds[0][1]))}
+        print(drone.channels.overrides)
     print("Drone disarmed")
 
 
@@ -52,7 +54,7 @@ def run():
 if len(sys.argv) > 1:
     model_file = sys.argv[1]
 else:
-    model_file = "model"
+    model_file = "model_2_0035_8606.949.hdf5"
 
 model = get_model(model_file)
 pipeline = rs.pipeline()
