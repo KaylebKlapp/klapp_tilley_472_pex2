@@ -54,10 +54,9 @@ def process_img(img):
     img_bw = inRange(rs_img, white_threshold, white)
     return  img_bw[0:320][80:240]
 
-def generate_training_data(num_samples = 512):
+def generate_training_data(batch_size = 512, epochs = 10):
 
     files = glob("*.bag", recursive= False)
-
     for file_name in files:
         if ("TRAINED" in file_name or "VALIDATION" in file_name):
             continue
@@ -89,7 +88,7 @@ def generate_training_data(num_samples = 512):
                 indexes = indexes[int(count / 2): count]
                 count = int(count/2)
 
-            while count < num_samples and line != "":
+            while count < batch_size and line != "":
                 heading, steering, throttle, index = get_attributes(line)
                 line = csv_fp.readline()
                 indexes.append(index)
@@ -106,13 +105,12 @@ def generate_training_data(num_samples = 512):
                 old_heading = heading
                 count += 1
 
-
-            yield [np.array(inputs), np.array(frames)], np.array(outputs)
+                yield [np.array(inputs), np.array(frames)], np.array(outputs)
 
         csv_fp.close()
         pipeline.stop()
-        #rename(csv_file, f"TRAINED_{csv_file}")
-        #rename(csv_file, f"TRAINED_{bag_file}")
+            #rename(csv_file, f"TRAINED_{csv_file}")
+            #rename(csv_file, f"TRAINED_{bag_file}")
 
 def generate_validation_data(file_path, num_samples=32):
     bag_file = file_path
@@ -148,11 +146,13 @@ def generate_validation_data(file_path, num_samples=32):
 
 
 def train_model(model, batch_size = 32):
+    batch_size = 1024
+    epochs = 10
     history = model.fit(
-        generate_training_data(),
+        generate_training_data(batch_size=batch_size, epochs=epochs),
         validation_data= (validation_data, validation_y),
-        batch_size=32,
-        epochs =100,
+        batch_size=batch_size,
+        epochs =epochs,
         verbose = 1)
     chdir(curdir)
     print(f"Saving model to {curdir}")
