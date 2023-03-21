@@ -1,6 +1,6 @@
 import pyrealsense2.pyrealsense2 as rs
 from cv2 import resize, inRange, imshow, waitKey
-from os import chdir, rename
+from os import chdir, rename,path
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
@@ -91,7 +91,7 @@ def generate_training_data(num_samples = 512):
                     frame = pipeline.wait_for_frames().get_color_frame()
 
                 img = np.asanyarray(frame.get_data())
-                inputs.append(heading - old_heading)
+                inputs.append([heading - old_heading])
                 outputs.append([steering, throttle])
                 frames.append(process_img(img))
                 
@@ -99,7 +99,7 @@ def generate_training_data(num_samples = 512):
                 count += 1
 
 
-            yield  [tf.expand_dims(frames, 0), inputs], outputs
+            yield  [tf.expand_dims(frames, 0),np.array( inputs)] ,np.array(outputs)
             return
 
         csv_fp.close()
@@ -134,13 +134,15 @@ def generate_validation_data(file_path, num_samples=512):
             frame = pipeline.wait_for_frames().get_color_frame()
         old_heading = old_heading - heading
 
-        validation_inputs.append([heading - old_heading])
+        validation_inputs.append(np.asarray([heading - old_heading]))
         validation_frames.append(process_img(np.asanyarray(frame.get_data())))
-        validation_inputs.append(heading)
         validation_inputs.append([steering, throttle])
 
+        np_validation_inputs =np.array(validation_inputs)
 
-    return [tf.expand_dims(validation_frames, 0), validation_inputs], validation_outputs
+        print( np_validation_inputs.shape)
+
+    return [tf.expand_dims(validation_frames, 0),np.array( validation_inputs)], np.array(validation_outputs)
 
 
 
@@ -156,7 +158,12 @@ def train_model(model, batch_size = 32):
 
 
 
-chdir("/media/usafa/extern_data/Team Just Kidding/Collections/")
+if path.isdir("/media/usafa/extern_data/Team Just Kidding/Collections/"):
+    chdir("/media/usafa/extern_data/Team Just Kidding/Collections/")
+else:
+     chdir("/media/internal/data/Collections/Collections/")
+
+
 validation_data = generate_validation_data("cc_1_0313_1037_49.bag")
 model = build_model()
 train_model(model)
