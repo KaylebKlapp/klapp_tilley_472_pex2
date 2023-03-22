@@ -22,7 +22,7 @@ def get_model(model_file):
     return model
 
 def get_predictions(heading, frame):
-    return model.predict((np.array([frame]), np.array([heading])))
+    return model.predict((np.array([heading]), np.array([frame])))
 
 
 white_threshold = np.array([215, 215, 215])
@@ -41,10 +41,14 @@ def run():
         heading = drone.heading - old_heading
         old_heading = drone.heading
 
-        preds =  get_predictions(p_frame, heading)
-        print(preds)
+        preds =  get_predictions(heading, p_frame)
+        steering  = int(preds[0][0])
+        throttle = int(preds[0][1])
+        steering = 8000 # if steering < 0 else steering
+        throttle = 8000 #:0 if throttle < 0 else throttle
 
-        drone.channels.overrides = {'1': int(abs(preds[0][0])), '3' : int(abs(preds[0][1]))}
+
+        drone.channels.overrides = {'1': steering, '3': throttle}
         print(drone.channels.overrides)
     print("Drone disarmed")
 
@@ -54,7 +58,7 @@ def run():
 if len(sys.argv) > 1:
     model_file = sys.argv[1]
 else:
-    model_file = "model_2_0035_8606.949.hdf5"
+    model_file = "model_2_0780_920.901.hdf5"
 
 model = get_model(model_file)
 pipeline = rs.pipeline()
