@@ -73,7 +73,8 @@ print(f"Device version: {drone.version}")
 
 while not drone.armed:
     print("Please switch device to armed...")
-    drone.mode = VehicleMode("GUIDED")
+    drone.mode = VehicleMode("MANUAL")
+    drone.armed = True
     time.sleep(1)
 
 run()
