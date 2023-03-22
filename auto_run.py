@@ -42,7 +42,6 @@ def run():
         old_heading = drone.heading
 
         preds =  get_predictions(heading, p_frame)
-        print(preds)
         if (preds[0][0] < 1300):
             continue
 
@@ -53,7 +52,7 @@ def run():
 
 
         drone.channels.overrides = {'1': steering, '3': throttle}
-        #print(drone.channels.overrides)
+        print(drone.channels.overrides)
     print("Drone disarmed")
 
 
