@@ -43,6 +43,9 @@ def run():
 
         preds =  get_predictions(heading, p_frame)
         print(preds)
+        if (preds[0][0] < 1300):
+            continue
+
         steering  = int(preds[0][0])
         throttle = int(preds[0][1])
         steering = 0 if steering < 0 else steering
