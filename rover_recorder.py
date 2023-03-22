@@ -68,6 +68,8 @@ def bind(rover, pipeline, logging, fps):
                 print("None found in channel")
                 continue
 
+            print(f"Channel 1: {rover.channels['1']} Channel 3: {rover.channels['3']}")
+
             throttle = int(rover.channels['3'])
             steering_mix = int(rover.channels['1'])
             frm_num = int(bgr_frame.frame_number)
