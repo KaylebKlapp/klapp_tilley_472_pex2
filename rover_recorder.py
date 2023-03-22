@@ -98,6 +98,7 @@ def start():
     #rover = connect_device("127.0.0.1:14550")
     rover = connect_device('/dev/ttyUSB0')
     arm_device(rover)
+    time.sleep(0.5)
     # prepare log file...
     handlers = [logging.FileHandler(log_file), logging.StreamHandler()]
     logging.info(f"Recording to be stored in location: {bag_file}.")
