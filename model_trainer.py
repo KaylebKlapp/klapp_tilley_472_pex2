@@ -41,14 +41,15 @@ def process_img(img):
     img_bw = inRange(rs_img, white_threshold, white)
     return  img_bw[0:320][80:240]
 
-def generate_training_data(num_samples = 32):
-    files = glob("*", recursive= False)
+def generate_training_data(num_samples = 512):
+    print("Hello?")
+    files = glob("*.bag", recursive= False)
 
     for file_name in files:
         if ("TRAINED" in file_name):
             continue
 
-        generic_file_name = file_name.removesuffix(".bag")
+        generic_file_name = file_name.rstrip(".bag")
         bag_file = file_name
         csv_file =  "csvs/" + generic_file_name + ".csv"
 
@@ -60,18 +61,28 @@ def generate_training_data(num_samples = 32):
 
         csv_fp = open(csv_file, "r")
         line = csv_fp.readline()
+        first_run = True
         while line != "":
-            inputs = [] if inputs == None else inputs[int(count/2) : count]
-            frames = [] if frames == None else frames[int (count/2) : count]
-            outputs = [] if outputs == None else outputs[int (count/2) : count]
-            indexes = [] if indexes == None else indexes[int (count/2) : count]
-            old_heading = 0 if heading == None else heading
-            count = 0 if count == 0 else int(count/2)
+            if first_run:
+                inputs = []
+                frames = []
+                outputs = []
+                indexes = []
+                old_heading = 0
+                count = 0
+                first_run = False
+            else:
+                inputs = inputs[int(count / 2): count]
+                frames = frames[int(count / 2): count]
+                outputs =outputs[int(count / 2): count]
+                indexes = indexes[int(count / 2): count]
+                old_heading = int(count / 2)
+                count = int(count/2)
+
             while count < num_samples and line != "":
                 heading, steering, throttle, index = get_attributes(line)
                 line = csv_fp.readline()
                 indexes.append(index)
-                count += 1
                 
                 frame = pipeline.wait_for_frames().get_color_frame()
                 while frame.frame_number < indexes[count]:
@@ -83,8 +94,12 @@ def generate_training_data(num_samples = 32):
                 frames.append(process_img(img))
                 
                 old_heading = heading
-          
-            yield frames, inputs, outputs
+                count += 1
+
+            for frame in frames:
+                imshow("hello", frame)
+                waitKey(10)
+            yield  frames, inputs, outputs
 
         csv_fp.close()
         pipeline.stop()
@@ -117,11 +132,12 @@ def generate_validation_data(file_path, num_samples=512):
         old_heading = old_heading - heading
 
         validation_inputs.append([heading - old_heading])
-        validation_frames.append(frame)
+        img = np.asanyarray
+        validation_frames.append(process_img(np.asanyarray(frame.get_data)))
         validation_inputs.append([steering, throttle])
 
-        while (True):
-            yield validation_frames, validation_inputs, validation_outputs
+    while (True):
+        yield validation_frames, validation_inputs, validation_outputs
 
 
 def train_model(model, batch_size = 32):
@@ -129,8 +145,9 @@ def train_model(model, batch_size = 32):
 
 chdir("/media/usafa/extern_data/Team Just Kidding/Collections/")
 
-validation_file = None
-model = build_model()
-
+validation_file = "cc_1_0313_1037_49.bag"
+for dat in generate_validation_data(validation_file):
+    imshow("data", dat[0])
+    waitKey(10)
 
 
