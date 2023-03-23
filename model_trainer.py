@@ -1,3 +1,5 @@
+import random
+
 import pyrealsense2.pyrealsense2 as rs
 from cv2 import resize, inRange, imshow, waitKey
 from os import chdir, rename, path, getcwd
@@ -7,7 +9,7 @@ from tensorflow import keras
 from tensorflow.keras import layers
 from glob import glob
 import matplotlib.pyplot as plt
-from random import sample
+from random import sample, randint
 height = 160
 width = 320
 
@@ -15,16 +17,24 @@ width = 320
 def build_model():
     headings = layers.Input(shape=(1,), name='headings')
     images = layers.Input(shape=(height, width,1), name='images')
-    conv1 = layers.Conv2D(32, (6, 6), activation='relu')(images)
-    conv2 = layers.Conv2D(32, (3, 3), activation='relu')(conv1)
-    pool1 = layers.MaxPooling2D((2, 2))(conv2)
-    flatten = layers.Flatten()(pool1)
-    dense1 = layers.Dense(32, activation='relu')(flatten)
-    concat = layers.Concatenate()([dense1, headings])
-    dense2 = layers.Dense(64, activation='relu')(concat)
-    dense4 = layers.Dense(32, activation='relu')(dense2)
-    dense5 = layers.Dense(16, activation='relu')(dense4)
-    outputs = layers.Dense(2, name='outputs')(dense5)
+    conv1 = layers.Conv2D(32, (3, 3), activation='relu')(images)
+    pool1 = layers.MaxPooling2D((2, 2))(conv1)
+    conv2 = layers.Conv2D(64, (3, 3), activation='relu')(pool1)
+    pool2 = layers.MaxPooling2D((2, 2))(conv2)
+    conv3 = layers.Conv2D(128, (3, 3), activation='relu')(pool2)
+    pool3 = layers.MaxPooling2D((2, 2))(conv3)
+    flatten = layers.Flatten()(pool3)
+    #dense1 = layers.Dense(16, activation='relu')(flatten)
+    #drop0 = keras.layers.Dropout(rate=0.5)(dense1)
+    concat = layers.Concatenate()([flatten, headings])
+    dense1 = layers.Dense(256, activation='relu')(concat)
+    dense2 = layers.Dense(128, activation='relu')(dense1)
+    #drop1 = keras.layers.Dropout(rate=0.5)(dense2)
+    dense3 = layers.Dense(64, activation='relu')(dense2)
+    dense31 = layers.Dense(32, activation='relu')(dense3)
+    dense4 = layers.Dense(16, activation='relu')(dense31)
+    #drop2 = keras.layers.Dropout(rate=0.5)(dense5)
+    outputs = layers.Dense(2, name='outputs')(dense4)
 
     model = keras.Model(inputs=[headings, images], outputs=outputs)
     model.compile(optimizer='adam', loss='mse', metrics=[keras.losses.mean_absolute_percentage_error])
@@ -75,8 +85,6 @@ def generate_training_data(batch_size = 512):
 
             csv_fp = open(csv_file, "r")
             line = csv_fp.readline()
-            first_run = True
-            old_heading = 0
 
             while line != "":
                 if True:
@@ -86,20 +94,14 @@ def generate_training_data(batch_size = 512):
                     indexes = []
                     old_heading = 0
                     count = 0
-                    first_run = False
-                # else:
-                #     inputs = inputs[int(count / 2): count]
-                #     frames = frames[int(count / 2): count]
-                #     outputs =outputs[int(count / 2): count]
-                #     indexes = indexes[int(count / 2): count]
-                #     count = int(count/2)
-
                 for i in range(batch_size):
                     line = csv_fp.readline()
                     if line == "":
                         break
 
                     throttle, steering, heading, index = get_attributes(line)
+                    if throttle > 1650:
+                        throttle = 1650 + ((throttle-1650)*.5)
                     indexes.append(index)
 
                     frame = pipeline.wait_for_frames().get_color_frame()
@@ -117,9 +119,6 @@ def generate_training_data(batch_size = 512):
                     yield [np.array(inputs), np.array(frames)], np.array(outputs)
             csv_fp.close()
             pipeline.stop()
-            #rename(csv_file, f"TRAINED_{csv_file}")
-            #rename(csv_file, f"TRAINED_{bag_file}")
-
 def generate_validation_data(num_samples = 1024):
     num_samples = num_samples/2
     validation_frames = []
@@ -138,6 +137,8 @@ def generate_validation_data(num_samples = 1024):
         for i in range(0, num_lines, offset):
             _, _, old_heading, _ = get_attributes(lines[i - 1]) if i != 1 else [0,0,0,0]
             throttle, steering, heading, index = get_attributes(lines[i])
+            if throttle > 1650:
+                throttle = 1650 + ((throttle-1650)*.5)
             frame = pipeline.wait_for_frames().get_color_frame()
 
             while frame.frame_number < index:
@@ -163,10 +164,10 @@ def get_samples_length():
     return length
 
 
-model_version = 2
+model_version = 7.2
 def train_model(model):
-    batch_size = 32
-    epochs = 20
+    batch_size = 64
+    epochs = 30
     x_dat = generate_training_data(batch_size=batch_size)
     step_num = get_samples_length() / batch_size
     DEVICE = '/GPU:0'
@@ -208,7 +209,6 @@ else:
 
 
 validation_data, validation_y = generate_validation_data()
-print(len(validation_data[0]))
 model = None
 train_model(model)
 
