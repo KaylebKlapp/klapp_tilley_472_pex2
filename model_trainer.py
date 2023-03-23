@@ -23,8 +23,10 @@ def build_model():
 
     model = keras.Model(inputs=[headings, images], outputs=outputs)
 
-    model.compile(optimizer='adam', loss={'outputs': 'mse'},
+    c_model = model.compile(optimizer='adam', loss={'outputs': 'mse'},
                   metrics={'throttle': 'mae', 'steering': 'mae'})
+    
+    model.save("model")
     return model
 
 
@@ -62,6 +64,7 @@ def generate_training_data(num_samples = 512):
         csv_fp = open(csv_file, "r")
         line = csv_fp.readline()
         first_run = True
+        old_heading = None
         while line != "":
             if first_run:
                 inputs = []
@@ -76,7 +79,6 @@ def generate_training_data(num_samples = 512):
                 frames = frames[int(count / 2): count]
                 outputs =outputs[int(count / 2): count]
                 indexes = indexes[int(count / 2): count]
-                old_heading = int(count / 2)
                 count = int(count/2)
 
             while count < num_samples and line != "":
@@ -99,7 +101,7 @@ def generate_training_data(num_samples = 512):
             for frame in frames:
                 imshow("hello", frame)
                 waitKey(10)
-            yield  frames, inputs, outputs
+            yield  [frames, inputs], outputs
 
         csv_fp.close()
         pipeline.stop()
@@ -124,30 +126,37 @@ def generate_validation_data(file_path, num_samples=512):
     config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
     pipeline.start(config)
     old_heading = 0
-    for line in lines:
-        heading, steering, throttle, index = get_attributes(line)
+    for i in range(0, num_lines, offset):
+        old_heading, _, _ = get_attributes(lines[i - 1]) if i is not 1 else 0
+        heading, steering, throttle, index = get_attributes(lines[i])
         frame = pipeline.wait_for_frames().get_color_frame()
         while frame.frame_number < index:
             frame = pipeline.wait_for_frames().get_color_frame()
         old_heading = old_heading - heading
 
         validation_inputs.append([heading - old_heading])
-        img = np.asanyarray
-        validation_frames.append(process_img(np.asanyarray(frame.get_data)))
+        validation_frames.append(process_img(np.asanyarray(frame.get_data())))
+        validation_inputs.append(heading)
         validation_inputs.append([steering, throttle])
 
-    while (True):
-        yield validation_frames, validation_inputs, validation_outputs
 
+    return [validation_frames, validation_inputs], validation_outputs
+
+
+#validation_data = generate_validation_data(validation_fp)
 
 def train_model(model, batch_size = 32):
+    # history = model.fit(
+    #     generate_training_data,
+    #     validation_data=validation_data,
     pass
 
-chdir("/media/usafa/extern_data/Team Just Kidding/Collections/")
 
-validation_file = "cc_1_0313_1037_49.bag"
-for dat in generate_validation_data(validation_file):
-    imshow("data", dat[0])
-    waitKey(10)
+
+
+#chdir("/media/usafa/extern_data/Team Just Kidding/Collections/")
+model = build_model()
+
+
 
 
