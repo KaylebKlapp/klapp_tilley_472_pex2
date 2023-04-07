@@ -44,7 +44,7 @@ def process_img(img, throttle):
 def run():
     print("Running...")
     frame = np.asanyarray(pipeline.wait_for_frames().get_color_frame().get_data())
-    p_frame, score = process_img(frame)
+    p_frame, score = process_img(frame, 1500)
     preds = get_predictions(score, p_frame)
     old_throttle = 0
 
