@@ -87,7 +87,7 @@ path_to_data = "/home/usafa/Desktop/team_just_kidding/processed_data"
 
 def generate_training_data_shuffled(batch_size = 500, files=None):
     sub_dirs = glob("*_dir", recursive=False) if files is None else files
-    random.shuffle(sub_dirs)
+    sub_dirs = random.shuffle(sub_dirs)
     while True:
         for file_dir in sub_dirs:
             inputs = []
