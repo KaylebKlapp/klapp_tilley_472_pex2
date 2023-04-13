@@ -26,14 +26,12 @@ def build_model():
     conv3 = layers.Conv2D(128, (3, 3), activation='relu')(pool2)
     pool3 = layers.MaxPooling2D((2, 2))(conv3)
     flatten = layers.Flatten()(pool3)
-    #dense1 = layers.Dense(16, activation='relu')(flatten)
-    #drop0 = keras.layers.Dropout(rate=0.5)(dense1)
     concat = layers.Concatenate()([flatten, inputs])
-    #drop1 = keras.layers.Dropout(rate=0.5)(dense2)
-    dense3 = layers.Dense(64, activation='relu')(concat)
+    dense5 = layers.Dense(256, activation='relu')(concat)
+    dense4 = layers.Dense(128, activation='relu')(dense5)
+    dense3 = layers.Dense(64, activation='relu')(dense4)
     dense2 = layers.Dense(32, activation='relu')(dense3)
     dense1 = layers.Dense(16, activation='relu')(dense2)
-    #drop2 = keras.layers.Dropout(rate=0.5)(dense1)
     outputs = layers.Dense(2, name='outputs')(dense1)
 
     model = keras.Model(inputs=[inputs, images], outputs=outputs)
@@ -48,7 +46,7 @@ def get_attributes(csv_string):
     return throttle, steering, heading, index
 
 
-white_threshold = np.array([215, 215, 215])
+white_threshold = np.array([205, 205, 205])
 white = np.array([255, 255, 255])
 
 
@@ -69,6 +67,7 @@ def process_img(img, throttle):
     img_bw = inRange(rs_img, white_threshold, white)[0:width][80:240]
     score_img, score = get_scored_img(img_bw, throttle)
     img_stacked = np.dstack((img_bw, score_img))
+
     return img_stacked, score
 
 
@@ -78,35 +77,44 @@ num_bytes_img = 921600
 def unbin_file(file):
     fp = open(file, 'rb')
     img = np.frombuffer(fp.read(num_bytes_img), np.uint8).reshape(480, 640, 3)
-    throttle, steering, heading, index = np.frombuffer(fp.read(32), np.uint64).reshape(4).tolist()
+    throttle, old_throttle, steering, heading, old_heading, index = np.frombuffer(fp.read(48), np.uint64).reshape(6).tolist()
     fp.close()
-    return img, throttle, steering, heading, index
+
+    return img, throttle, old_throttle, steering, heading, old_heading, index
 
 
-path_to_data = "/home/usafa/Desktop/team_just_kidding/processed_data"
+path_to_data = "/home/usafa/Desktop/team_just_kidding/experimental_processed_data"
+#path_to_data = '/media/usafa/ext_data/experimental_processed_data_flipped'
 
 def generate_training_data_shuffled(batch_size = 500, files=None):
     sub_dirs = glob("*_dir", recursive=False) if files is None else files
-    sub_dirs = random.shuffle(sub_dirs)
+    random.shuffle(sub_dirs)
     while True:
         for file_dir in sub_dirs:
+            if ("noise" in file_dir):
+                continue
+
             inputs = []
             frames = []
             outputs = []
             for i in range(int(batch_size / 5)):
-                old_heading = -1
-                for dat_file in glob(file_dir + "/*", recursive=False):
-                    img, throttle, steering, heading, index = unbin_file(dat_file)
-                    if old_heading == -1:
-                        old_heading = heading
-                    p_img, score = process_img(img, throttle)
-                    frames.append(p_img)
-                    outputs.append([steering, throttle])
-                    inputs.append(score)
-
-                    old_heading = heading
-
-            yield [np.array(inputs), np.array(frames)], np.array(outputs)
+                try:
+                    for dat_file in glob(file_dir + "/*", recursive=False):
+                        img, throttle, old_throttle, steering, heading, old_heading, index = unbin_file(dat_file)
+                        if (steering > 1500 or steering < 1490):
+                            loop = 5
+                            i += 4
+                        else:
+                            loop = 1
+                        for i in range(loop):
+                            p_img, score = process_img(img, old_throttle)
+                            frames.append(p_img)
+                            outputs.append([steering, throttle])
+                            inputs.append(score)
+                except:
+                    print(f"Bad file data found at ", dat_file)
+            if (len(outputs) != 0):
+                yield [np.array(inputs), np.array(frames)], np.array(outputs)
 
 
 def generate_validation_data_preprocessed(files):
@@ -120,25 +128,22 @@ def generate_validation_data_preprocessed(files):
     old_heading = -1
     index = 0
     for dat_file in dat_files:
-        img, throttle, steering, heading, index = unbin_file(dat_file)
-        if index % 5 == 0:
-            old_heading = heading
-        p_img, score = process_img(img, throttle)
+        img, throttle, old_throttle, steering, heading, old_heading, index = unbin_file(dat_file)
+        p_img, score = process_img(img, old_throttle)
         frames.append(p_img)
         outputs.append([steering, throttle])
         inputs.append(score)
-
-        old_heading = heading
-
+        
     return [np.array(inputs), np.array(frames)], np.array(outputs)
 
 
 def split_training_validation_data(batch_size, num_validation=400):
     files = glob("*_dir", recursive=False)
-    validation_files = random.sample(files, int(num_validation / 5))
+    files_per_dir = len(glob(files[0] + "/*.bin", recursive=False))
+    validation_files = random.sample(files, int(num_validation / files_per_dir))
     for fp in validation_files:
         files.remove(fp)
-    return (5 * len(files)) / batch_size, files, validation_files
+    return (files_per_dir * len(files)) / batch_size, files, validation_files
 
 
 def get_image_score(img, throttle):
@@ -147,17 +152,18 @@ def get_image_score(img, throttle):
 
 def get_scored_img(img, throttle):
     scored_img= np.multiply((img / 255), kernel)
-    score = np.sum(scored_img)
+    score = np.sum(scored_img) * (throttle / 2000)
     return scored_img, score
 
-model_version = 9
+model_version = 15
 def train_model():
-    batch_size = 65
-    epochs = 60
+    batch_size = 64
+    epochs = 40
     step_num, train_files, validation_files = split_training_validation_data(batch_size)
     validation_data, validation_y = generate_validation_data_preprocessed(validation_files)
     x_dat = generate_training_data_shuffled(batch_size=batch_size, files=train_files)
     device = '/GPU:0'
+    history = None
     with tf.device(device):
         model = build_model()
         save_fp = f'{curdir}/Models/model_{model_version}_'+'{epoch:04d}_{val_loss:.3f}.hdf5'
@@ -170,10 +176,10 @@ def train_model():
             epochs=epochs,
             verbose=1,
             callbacks=[save_best])
+
     chdir(curdir)
     print(f"Saving model to {curdir}")
     model.save("trained_model")
-    return model
 
     plt.plot(history.history['loss'])
     plt.plot(history.history['val_loss'])
@@ -183,17 +189,18 @@ def train_model():
     plt.legend(['train', 'validation'])
     plt.show()
 
+    return model
+
 
 curdir = getcwd()
-chdir("/home/usafa/Desktop/team_just_kidding/processed_data/")
-
+chdir("/home/usafa/Desktop/team_just_kidding/experimental_processed_data")
 model = None
-kernel = sc.get_gaussian_matrix(h=height, w=width, h_stdev=0.6, w_stdev=.04, shift=100)
-kernel += sc.get_gaussian_matrix(h=height, w=width, h_stdev=0.2, w_stdev=.15, shift=40)
+kernel = sc.get_gaussian_matrix(h=height, w=width, h_stdev=1, w_stdev=.18, shift=40)
+kernel += sc.get_gaussian_matrix(h=height, w=width, h_stdev=0.2, w_stdev=.4, shift=100)
 kernel /= 2
-imshow("kernel", kernel)
-waitKey(0)
 model = train_model()
+# imshow('kernel', kernel)
+# waitKey(0)
 
 
 
